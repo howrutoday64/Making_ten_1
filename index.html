@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>萌萌動物森林：十之勇者 (終極修補版)</title>
+    <style>
+        :root {
+            --sky: #4fc3f7;
+            --grass-dark: #2e7d32;
+            --grass-light: #81c784;
+            --wood: #5d4037;
+            --font-main: 'Microsoft JhengHei', 'PingFang TC', sans-serif;
+            --hint-color: #00e5ff;
+        }
+
+        body, html {
+            margin: 0; padding: 0; width: 100%; height: 100%;
+            overflow: hidden; font-family: var(--font-main);
+            background: var(--sky);
+        }
+
+        #game-container {
+            width: 100%; height: 100%; position: relative;
+            background: linear-gradient(to bottom, #4fc3f7 0%, #e1f5fe 40%, #81c784 40%, #2e7d32 100%);
+            display: flex; flex-direction: column; align-items: center;
+        }
+
+        /* 背景與 UI */
+        .cloud { position: absolute; background: white; border-radius: 50px; opacity: 0.8; z-index: 1; }
+        .tree { position: absolute; background: var(--wood); z-index: 2; border-radius: 5px 5px 0 0; }
+        .tree-top { position: absolute; background: #1b5e20; border-radius: 50%; }
+
+        #ui-layer { z-index: 100; width: 100%; padding: 10px 0; text-align: center; }
+        #nav-controls { display: flex; justify-content: space-around; width: 95%; max-width: 600px; margin: 0 auto; gap: 5px; }
+        .ui-box { background: rgba(255,255,255,0.95); border: 3px solid #333; border-radius: 15px; padding: 6px 12px; font-weight: bold; }
+        .hp-box { color: #e91e63; }
+        .gem-box { color: #0288d1; cursor: pointer; border: 3px solid #0288d1; animation: gemGlow 2s infinite; }
+        @keyframes gemGlow { 0%, 100% { box-shadow: 0 0 5px #0288d1; } 50% { box-shadow: 0 0 20px #0288d1; } }
+
+        #menu { display: flex; flex-direction: column; align-items: center; margin-top: 50px; z-index: 110; }
+        .btn {
+            background: #fff; border: 4px solid #333; border-radius: 50px;
+            padding: 15px 40px; margin: 10px; font-size: 1.4rem; cursor: pointer;
+            box-shadow: 0 6px #666; width: 280px; font-weight: bold; transition: 0.1s;
+        }
+        .btn:active { transform: translateY(3px); box-shadow: 0 2px #333; }
+
+        #stage { flex-grow: 1; width: 100%; position: relative; overflow: hidden; z-index: 10; }
+
+        /* 動物與閃光 */
+        .animal-head {
+            width: 95px; height: 95px; position: absolute;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            background: white; border: 4px solid #333; border-radius: 50%;
+            box-shadow: 0 6px 15px rgba(0,0,0,0.3); cursor: pointer; z-index: 50;
+        }
+        .animal-head .emoji { font-size: 3rem; }
+        .animal-head .num { font-size: 1.5rem; font-weight: bold; background: #333; color: white; border-radius: 8px; padding: 1px 12px; margin-top: -3px; }
+        .animal-head.selected { border-color: #ffeb3b; transform: scale(1.1); box-shadow: 0 0 30px #ffeb3b; }
+
+        .hint-pulse {
+            position: absolute; width: 100%; height: 100%;
+            border-radius: 50%; pointer-events: none;
+            border: 8px solid var(--hint-color);
+            animation: pulse-ring 1s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+            z-index: 45;
+        }
+        @keyframes pulse-ring { 0% { transform: scale(0.8); opacity: 1; } 100% { transform: scale(1.8); opacity: 0; } }
+
+        #message {
+            position: absolute; top: 40%; left: 0; width: 100%;
+            text-align: center; font-size: 6rem; font-weight: bold; 
+            color: #ffeb3b; text-shadow: 5px 5px #000; display: none; z-index: 500;
+        }
+
+        #overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 2000; display: none; flex-direction: column; align-items: center; justify-content: center; color: white; text-align: center; }
+        .badge-anim { animation: badgePop 1.2s infinite ease-in-out; font-size: 11rem; margin: 10px 0; filter: drop-shadow(0 0 30px gold); }
+        @keyframes badgePop { 0%, 100% { transform: scale(0.85); } 50% { transform: scale(1.15); } }
+
+        #collection-box {
+            width: 90%; max-width: 500px; height: 95px; background: #a1887f; border: 6px solid var(--wood); border-radius: 20px;
+            position: relative; margin-bottom: 20px; display: flex; align-items: center; justify-content: center; z-index: 100;
+        }
+        .box-label { position: absolute; top: -15px; background: var(--wood); color: white; padding: 2px 15px; border-radius: 10px; font-size: 0.9rem; }
+        #items-display { font-size: 3rem; display: flex; gap: 15px; align-items: center; }
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <div id="ui-layer">
+        <h1 style="margin:0; color:#1b5e20; text-shadow: 1px 1px white;">🐾 動物湊十勇者</h1>
+        <div id="round-display" style="display:none; font-weight:bold; color:#1b5e20;">進度：1 / 5</div>
+        <div id="nav-controls" style="display:none;">
+            <div class="ui-box hp-box" id="hp-display">❤️x3</div>
+            <div id="timer-display" class="ui-box">⏱️30s</div>
+            <div id="gem-display" class="ui-box gem-box" onclick="useHint()">💎x3</div>
+            <button class="ui-box" onclick="location.reload()">🏠</button>
+        </div>
+    </div>
+
+    <div id="menu">
+        <button class="btn" style="background:#c8e6c9" onclick="initGame('easy')">森林散步 🌱</button>
+        <button class="btn" style="background:#fff9c4" onclick="initGame('medium')">林間奔跑 🌟</button>
+        <button class="btn" style="background:#ffccbc" onclick="initGame('hard')">荒野挑戰 🔥</button>
+    </div>
+
+    <div id="stage"></div>
+    <div id="message">正 確 ！</div>
+
+    <div id="collection-box">
+        <div class="box-label">勇者成就箱</div>
+        <div id="items-display">📦</div>
+    </div>
+
+    <div id="overlay">
+        <h1 id="overlay-msg" style="font-size:2rem;">獲得徽章！</h1>
+        <div id="overlay-icon" class="badge-anim"></div>
+        <div id="congrats-text" style="font-size:1.4rem; color:gold; line-height: 1.4; white-space: pre-line; margin-bottom: 20px;"></div>
+        <div id="overlay-choices" style="display:flex; gap:15px; justify-content:center;">
+            <button class="btn" id="action-btn" onclick="collectBadge()">領取徽章</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    const AudioService = (() => {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        let bgmInterval = null, clapInterval = null;
+        function playTone(freq, type, dur, vol) {
+            if (ctx.state === 'suspended') ctx.resume();
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = type; osc.frequency.setValueAtTime(freq, ctx.currentTime);
+            gain.gain.setValueAtTime(vol, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + dur);
+            osc.connect(gain); gain.connect(ctx.destination);
+            osc.start(); osc.stop(ctx.currentTime + dur);
+        }
+        return {
+            playBGM: () => { if (!bgmInterval) bgmInterval = setInterval(() => { playTone(261.6, 'square', 0.1, 0.01); setTimeout(() => playTone(329.6, 'square', 0.1, 0.01), 250); }, 600); },
+            stopBGM: () => { clearInterval(bgmInterval); bgmInterval = null; },
+            playCorrect: () => { playTone(523, 'sine', 0.2, 0.1); setTimeout(() => playTone(659, 'sine', 0.2, 0.1), 100); },
+            playWrong: () => playTone(130, 'square', 0.3, 0.1),
+            playAward: () => { [523, 659, 783, 1046, 1318].forEach((f, i) => setTimeout(() => playTone(f, 'sine', 1, 0.1), i * 120)); },
+            startClap: () => { if(!clapInterval) clapInterval = setInterval(() => playTone(Math.random() * 200 + 100, 'triangle', 0.08, 0.04), 70); },
+            stopClap: () => { clearInterval(clapInterval); clapInterval = null; }
+        };
+    })();
+
+    const state = {
+        diff: '', round: 1, timeLeft: 0, timer: null, hp: 3, gems: 3,
+        selected: [], badges: new Set(), heads: [], currentPairs: []
+    };
+
+    const diffMap = {
+        easy: { count: 5, time: 30, move: false, spd: 0, badge: '🌱' },
+        medium: { count: 8, time: 25, move: false, spd: 0, badge: '🌟' },
+        hard: { count: 8, time: 20, move: true, spd: 1.5, badge: '🔥' },
+        ultimate: { count: 8, time: 15, move: true, spd: 4.5, badge: '⚔️' }
+    };
+
+    function initGame(d) {
+        AudioService.playBGM(); AudioService.stopClap();
+        state.diff = d; state.round = 1; state.hp = 3; state.gems = (d === 'ultimate') ? 0 : 3;
+        state.currentPairs = [[1,9],[2,8],[3,7],[4,6],[5,5]].sort(() => Math.random() - 0.5);
+        document.getElementById('menu').style.display = 'none';
+        document.getElementById('nav-controls').style.display = 'flex';
+        document.getElementById('round-display').style.display = 'block';
+        updateUI(); startRound();
+    }
+
+    function startRound() {
+        const stage = document.getElementById('stage'); stage.innerHTML = ''; state.selected = []; state.heads = [];
+        const cfg = diffMap[state.diff]; state.timeLeft = cfg.time;
+        document.getElementById('round-display').innerText = `進度：${state.round} / 5`;
+        const correctPair = state.currentPairs[state.round - 1];
+        const nums = generateNums(cfg.count, correctPair);
+        const rect = stage.getBoundingClientRect();
+        
+        if (state.diff === 'easy') {
+            const pos = [{x:20,y:20}, {x:70,y:20}, {x:45,y:45}, {x:20,y:70}, {x:70,y:70}];
+            nums.forEach((n, i) => createHead(n, (pos[i].x * rect.width)/100 - 47, (pos[i].y * rect.height)/100 - 47, 0, 0));
+        } else {
+            const cells = []; for(let r=0; r<3; r++) for(let c=0; c<4; c++) cells.push({r,c});
+            cells.sort(() => Math.random() - 0.5);
+            nums.forEach((n, i) => {
+                const x = (cells[i].c * rect.width/4) + (rect.width/4 - 95)/2;
+                const y = (cells[i].r * rect.height/3) + (rect.height/3 - 95)/2;
+                createHead(n, x, y, cfg.move ? (Math.random()-0.5)*cfg.spd : 0, cfg.move ? (Math.random()-0.5)*cfg.spd : 0);
+            });
+        }
+        clearInterval(state.timer); state.timer = setInterval(update, 20);
+    }
+
+    function createHead(n, x, y, vx, vy) {
+        const div = document.createElement('div');
+        div.className = 'animal-head'; div.style.left = x + 'px'; div.style.top = y + 'px';
+        div.dataset.value = n;
+        div.innerHTML = `<span class="emoji">${['🦁','🐯','🦒','🐘','🦊','🐼','🐰','🐵'][Math.floor(Math.random()*8)]}</span><span class="num">${n}</span>`;
+        div.onclick = () => {
+            if(div.classList.contains('selected')) { div.classList.remove('selected'); state.selected = state.selected.filter(s => s !== div); }
+            else { if(state.selected.length >= 2) state.selected.shift().classList.remove('selected'); div.classList.add('selected'); state.selected.push(div); if(state.selected.length === 2) checkAnswer(); }
+        };
+        document.getElementById('stage').appendChild(div);
+        state.heads.push({ el: div, x, y, vx, vy, val: n });
+    }
+
+    function generateNums(count, pair) {
+        let res = [...pair];
+        while(res.length < count) { let r = Math.floor(Math.random()*9)+1; if(!res.some(n => n + r === 10)) res.push(r); }
+        return res.sort(() => Math.random() - 0.5);
+    }
+
+    function useHint() {
+        if(state.gems <= 0 || state.diff === 'ultimate') return;
+        state.gems--; updateUI();
+        const pair = state.currentPairs[state.round - 1];
+        state.heads.forEach(h => {
+            if(pair.includes(h.val)) {
+                const pulse = document.createElement('div');
+                pulse.className = 'hint-pulse'; h.el.appendChild(pulse);
+                setTimeout(() => pulse.remove(), 2500);
+            }
+        });
+    }
+
+    function checkAnswer() {
+        const sum = state.selected.reduce((a, b) => a + parseInt(b.dataset.value), 0);
+        if(sum === 10) {
+            AudioService.playCorrect(); document.getElementById('message').style.display = 'block';
+            setTimeout(() => { document.getElementById('message').style.display = 'none'; if(state.round < 5) { state.round++; startRound(); } else finishLevel(); }, 600);
+        } else { AudioService.playWrong(); state.selected.forEach(el => el.classList.remove('selected')); state.selected = []; }
+    }
+
+    function update() {
+        state.timeLeft -= 0.02; document.getElementById('timer-display').innerText = `⏱️${Math.ceil(state.timeLeft)}s`;
+        if(state.timeLeft <= 0) { clearInterval(state.timer); state.hp--; updateUI(); if(state.hp <= 0) { alert("失敗！"); location.reload(); } else { alert("時間到！"); startRound(); } return; }
+        const stageRect = document.getElementById('stage').getBoundingClientRect();
+        state.heads.forEach(h => { h.x += h.vx; h.y += h.vy; if(h.x < 5 || h.x > stageRect.width - 100) h.vx *= -1; if(h.y < 5 || h.y > stageRect.height - 100) h.vy *= -1; h.el.style.left = h.x + 'px'; h.el.style.top = h.y + 'px'; });
+    }
+
+    function updateUI() { document.getElementById('hp-display').innerText = `❤️x${state.hp}`; document.getElementById('gem-display').innerText = (state.diff === 'ultimate') ? "🚫" : `💎x${state.gems}`; }
+
+    function finishLevel() {
+        clearInterval(state.timer); AudioService.stopBGM();
+        const overlay = document.getElementById('overlay');
+        const overlayIcon = document.getElementById('overlay-icon');
+        const overlayMsg = document.getElementById('overlay-msg');
+        const congratsText = document.getElementById('congrats-text');
+        const choices = document.getElementById('overlay-choices');
+
+        if(state.diff === 'ultimate') {
+            AudioService.playAward(); AudioService.startClap();
+            overlayIcon.innerText = "⚔️"; overlayMsg.innerText = "🎊 傳奇勇者誕生 🎊";
+            congratsText.innerText = "恭喜你挑戰了所有關卡！\n你已成為森林最強的勇者！";
+            choices.innerHTML = `<button class="btn" onclick="location.reload()">再次挑戰</button>`;
+        } else {
+            AudioService.playAward();
+            overlayIcon.innerText = diffMap[state.diff].badge; overlayMsg.innerText = "關卡完成！";
+            congratsText.innerText = "獲得新徽章了！點擊下方領取：";
+            choices.innerHTML = `<button class="btn" onclick="collectBadge()">領取徽章</button>`;
+        }
+        overlay.style.display = 'flex';
+    }
+
+    function collectBadge() {
+        state.badges.add(state.diff);
+        updateBadgeBox();
+        const hasBase = ['easy','medium','hard'].every(d => state.badges.has(d));
+        if (hasBase && !state.badges.has('ultimate')) {
+            showUltimateInvitation();
+        } else {
+            closeOverlay();
+        }
+    }
+
+    function showUltimateInvitation() {
+        const overlayIcon = document.getElementById('overlay-icon');
+        const overlayMsg = document.getElementById('overlay-msg');
+        const congratsText = document.getElementById('congrats-text');
+        const choices = document.getElementById('overlay-choices');
+
+        overlayIcon.innerText = "🏆";
+        overlayMsg.innerText = "🌟 英雄請留步 🌟";
+        congratsText.innerText = "你已集齊三枚徽章！系統即將開啟\n【終極任務：⚔️】，是否接受挑戰？";
+        
+        // 修正：在接受挑戰時先關閉覆蓋層，再初始化遊戲
+        choices.innerHTML = `
+            <button class="btn" style="background:#ffd700; width:180px;" onclick="closeOverlay(); initGame('ultimate');">接受挑戰！</button>
+            <button class="btn" style="background:#eee; width:180px;" onclick="closeOverlay()">先休息一下</button>
+        `;
+    }
+
+    function closeOverlay() {
+        document.getElementById('overlay').style.display = 'none';
+        document.getElementById('menu').style.display = 'flex';
+        document.getElementById('nav-controls').style.display = 'none';
+        document.getElementById('round-display').style.display = 'none';
+        document.getElementById('stage').innerHTML = '';
+        AudioService.stopClap();
+    }
+
+    function updateBadgeBox() {
+        const box = document.getElementById('items-display');
+        let html = '📦';
+        ['easy','medium','hard','ultimate'].forEach(d => { if(state.badges.has(d)) html += `<span>${diffMap[d].badge}</span>`; });
+        box.innerHTML = html;
+    }
+</script>
+</body>
+</html>
